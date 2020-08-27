@@ -1,0 +1,3 @@
+flatdict
+influxdb
+requests
