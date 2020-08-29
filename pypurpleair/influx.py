@@ -86,24 +86,34 @@ class PurpleAirDb(influxdb.InfluxDBClient):
             time_precision=self._time_precision,
             database=self._db_name,
             default_return_value=False,
+            success_request_msg="Sensor measurement written to InfluxDB.",
         )
 
         if not success:
-            logging.info("Failed to write sensor measurement to InfluxDB.")
+            logging.warning("Failed to write sensor measurement to InfluxDB.")
         return success
 
-    def _run_influx_request(self, func, *args, default_return_value: Any, **kwargs) -> bool:
+    def _run_influx_request(
+        self,
+        func,
+        *args,
+        default_return_value: Any,
+        success_request_msg: Optional[str] = None,
+        **kwargs,
+    ) -> bool:
         """Run a function that makes an InfluxDB request and handle any errors"""
         retval = default_return_value
         try:
             retval = func(*args, **kwargs)
-            self._set_connection_state(True)
+            if self._set_connection_state(True) and success_request_msg:
+                logging.info(success_request_msg)
         except rq_err.ConnectionError as err:
             if self._set_connection_state(False):
                 logging.error("Requests Connection Error:")
                 logging.error(str(err))
         except influx_err.InfluxDBClientError as err:
-            self._set_connection_state(True)
+            if self._set_connection_state(True) and success_request_msg:
+                logging.info(success_request_msg)
             msg = "InfluxDB Client Error:"
             if err.code is not None:
                 msg = f"{msg} (code: {err.code})"

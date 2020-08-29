@@ -4,6 +4,8 @@ import argparse
 import logging
 import time
 
+import coloredlogs
+
 from pypurpleair import influx
 from pypurpleair import pa_lan
 from pypurpleair import pa_web
@@ -36,7 +38,7 @@ def main():
     parser.add_argument("--gzip", action="store_true", help="InfluxDB use gzip.")
 
     kwargs = vars(parser.parse_args())
-    logging.basicConfig(level=logging.INFO)
+    coloredlogs.install(level="INFO", fmt="%(asctime)s %(levelname)s %(message)s")
 
     lan_addr = kwargs.pop("lan_addr")
     lan_live = kwargs.pop("lan_live")
