@@ -19,6 +19,12 @@ def main():
     parser.add_argument(
         "--query-interval", default=30, type=int, help="Number of seconds to wait between queries."
     )
+    parser.add_argument(
+        "--init-db-interval",
+        default=10,
+        type=int,
+        help="Number of seconds to wait to retry initial database connection",
+    )
     parser.add_argument("--lan-live", action="store_true", help="Use the live feed in LAN mode.")
     parser.add_argument("-H", "--host", type=str, default="localhost", help="InfluxDB host.")
     parser.add_argument("-P", "--port", type=int, default=8086, help="InfluxDB port.")
@@ -44,6 +50,7 @@ def main():
     lan_live = kwargs.pop("lan_live")
     web_sensor_id = kwargs.pop("web_sensor_id")
     query_interval = kwargs.pop("query_interval")
+    init_db_interval = kwargs.pop("query_interval")
 
     db = influx.PurpleAirDb(**kwargs)
     if lan_addr:
@@ -60,7 +67,7 @@ def main():
 
     # Wait for the database to come online.
     while not db.init_database():
-        time.sleep(query_interval)
+        time.sleep(init_db_interval)
 
     logging.info(f"Data is fetched on a {query_interval} second interval.")
     try:
