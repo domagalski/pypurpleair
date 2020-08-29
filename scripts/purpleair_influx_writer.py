@@ -50,7 +50,7 @@ def main():
     lan_live = kwargs.pop("lan_live")
     web_sensor_id = kwargs.pop("web_sensor_id")
     query_interval = kwargs.pop("query_interval")
-    init_db_interval = kwargs.pop("query_interval")
+    init_db_interval = kwargs.pop("init_db_interval")
 
     db = influx.PurpleAirDb(**kwargs)
     if lan_addr:
