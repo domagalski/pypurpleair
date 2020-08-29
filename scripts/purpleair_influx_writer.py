@@ -17,6 +17,9 @@ def main():
     sgroup.add_argument("-l", "--lan-addr", type=str, help="Address of a LAN sensor.")
     sgroup.add_argument("-w", "--web-sensor-id", type=int, help="Web sensor ID.")
     parser.add_argument(
+        "-n", "--n-queries", type=int, default=0, help="Maximum number of queries to make."
+    )
+    parser.add_argument(
         "--query-interval", default=30, type=int, help="Number of seconds to wait between queries."
     )
     parser.add_argument(
@@ -46,6 +49,7 @@ def main():
     kwargs = vars(parser.parse_args())
     coloredlogs.install(level="INFO", fmt="%(asctime)s %(levelname)s %(message)s")
 
+    n_queries = kwargs.pop("n_queries")
     lan_addr = kwargs.pop("lan_addr")
     lan_live = kwargs.pop("lan_live")
     web_sensor_id = kwargs.pop("web_sensor_id")
@@ -69,9 +73,18 @@ def main():
     while not db.init_database():
         time.sleep(init_db_interval)
 
-    logging.info(f"Data is fetched on a {query_interval} second interval.")
+    if n_queries > 0:
+        if n_queries == 1:
+            logging.info("Querying the sensor once.")
+        else:
+            logging.info(f"Querying the sensor {n_queries} times.")
+    if n_queries > 1:
+        logging.info(f"Data is fetched on a {query_interval} second interval.")
+
     try:
+        query_iter = 0
         while True:
+            query_iter += 1
             start = time.time()
             kwargs = {}
             if lan_addr:
@@ -83,13 +96,20 @@ def main():
             try:
                 sensor.query_and_write_database(**kwargs)
             # Can be caused by the web sensor
-            except RuntimeError:
-                pass
+            except RuntimeError as err:
+                logging.error(str(err))
+
+            if n_queries > 0 and query_iter == n_queries:
+                logging.info("Finished writing sensor measurements to InfluxDB.")
+                break
 
             elapsed = time.time() - start
             time.sleep(max(query_interval - elapsed, 0))
     except KeyboardInterrupt:
         print("")
+        logging.info("Keyboard interrupt detected.")
+
+    logging.info("Exiting PurpleAir InfluxDB writer.")
 
 
 if __name__ == "__main__":
