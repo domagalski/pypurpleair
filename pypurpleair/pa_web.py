@@ -5,14 +5,32 @@ import logging
 import json
 from typing import Any, Dict, Optional, Type, Union
 
-from pypurpleair import pa_base
+from pypurpleair import influx
+from pypurpleair import measurement_base
+from pypurpleair import sensor_base
+
+
+_SENSOR_KEYS = {
+    "pm1_0_atm",  # ATM PM1.0 particulate mass in ug/m3
+    "pm2_5_atm",  # ATM PM2.5 particulate mass in ug/m3
+    "pm10_0_atm",  # ATM PM10.0 particulate mass in ug/m3
+    "pm1_0_cf_1",  # CF=1 PM1.0 particulate mass in ug/m3
+    "pm2_5_cf_1",  # CF=1 PM2.5 particulate mass in ug/m3
+    "pm10_0_cf_1",  # CF=1 PM10.0 particulate mass in ug/m3
+    "p_0_3_um",  # 0.3 micrometer particle counts per deciliter of air
+    "p_0_5_um",  # 0.5 micrometer particle counts per deciliter of air
+    "p_1_0_um",  # 1.0 micrometer particle counts per deciliter of air
+    "p_2_5_um",  # 2.5 micrometer particle counts per deciliter of air
+    "p_5_0_um",  # 5.0 micrometer particle counts per deciliter of air
+    "p_10_0_um",  # 10.0 micrometer particle counts per deciliter of air
+}
 
 
 class WebDataError(Exception):
     pass
 
 
-class SensorReading(pa_base.SensorReadingBase):
+class Measurement(measurement_base.MeasurementBase):
     _ch_a: Dict[str, Any] = {}
     _ch_b: Dict[str, Any] = {}
     _ch_a_stats: Dict[str, Union[int, float]] = {}
@@ -30,6 +48,41 @@ class SensorReading(pa_base.SensorReadingBase):
         else:
             self._ch_b = results[1]
             self._ch_b_stats = json.loads(self._ch_b["Stats"])
+
+    def prepare_for_influxdb(self) -> Dict[str, Any]:
+        """Prepare data as an InfluxDB point"""
+
+        tags: Dict[str, Any] = {}
+        tags["sensor_id"] = self.sensor_id
+        tags["label"] = self._ch_a["Label"]
+        tags["lat"] = self.lat
+        tags["lon"] = self.lat
+        tags["hidden"] = self._ch_a["Hidden"].lower() == "true"
+
+        # If self._ch_b is available, then both sensors are present.
+        fields: Dict[str, Any] = {}
+        if self._ch_b:
+            for key in _SENSOR_KEYS:
+                fields[key] = self.__getattribute__(key)
+                fields[key + "_b"] = self.__getattribute__(key + "_b")
+            fields["pm2.5_aqi"] = self.pm2_5_aqi
+            fields["pm2.5_aqi_b"] = self.pm2_5_aqi_b
+            fields["temp_f"] = self.temp_f
+            fields["pressure"] = self.pressure
+            fields["humidity"] = self.humidity
+            fields["rssi"] = self.rssi
+            fields["uptime"] = self.uptime
+            tags["place"] = self.place
+            tags["version"] = self._ch_a["Version"]
+            tags["hardwarediscovered"] = self._ch_a["DEVICE_HARDWAREDISCOVERED"]
+            tags["type"] = self._ch_a["Type"]
+        else:
+            for key in _SENSOR_KEYS:
+                fields[key + "_b"] = self.__getattribute__(key)
+            fields["pm2.5_aqi_b"] = self.pm2_5_aqi
+
+        influx_point = {"time": self.timestamp, "tags": tags, "fields": fields}
+        return influx_point
 
     @property
     def sensor_id(self) -> int:
@@ -59,6 +112,13 @@ class SensorReading(pa_base.SensorReadingBase):
         if rssi is not None:
             rssi = int(rssi)
         return rssi
+
+    @property
+    def uptime(self) -> Optional[int]:
+        uptime = self._ch_a.get("Uptime")
+        if uptime is not None:
+            uptime = int(uptime)
+        return uptime
 
     @property
     def temp_f(self) -> Optional[int]:
@@ -111,7 +171,7 @@ class SensorReading(pa_base.SensorReadingBase):
                 index_breakpoints = aqi_limits[i]
                 break
         if limit is None:
-            raise RuntimeError("PM 2.5 out of range.")
+            raise RuntimeError(f"PM 2.5 out of range: {pm_2_5}")
 
         c_low, c_high = limit
         i_low, i_high = index_breakpoints
@@ -263,13 +323,25 @@ class SensorReading(pa_base.SensorReadingBase):
         return reading
 
 
-class Sensor(pa_base.SensorBase):
-    def __init__(self, sensor_id: int):
+class Sensor(sensor_base.SensorBase):
+    """Web sensor class.
+
+    This uses the JSON API for querying all online sensors.
+    """
+
+    def __init__(self, sensor_id: int, db: Optional[influx.PurpleAirDb] = None):
+        """Create a web sensor
+
+        Args:
+            sensor_id: (int) Numerical ID of the sensor.
+            db: Optional database client.
+        """
+        super().__init__(db)
         self._sensor_id = sensor_id
 
     @property
-    def _reading_klass(self) -> Type:
-        return SensorReading
+    def _measurement_klass(self) -> Type:
+        return Measurement
 
     def _construct_url(self) -> str:
         url = f"https://www.purpleair.com/json?show={self._sensor_id}"

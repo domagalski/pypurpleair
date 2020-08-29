@@ -5,12 +5,44 @@
 import re
 from typing import Any, Dict, Optional, Type
 
-from pypurpleair import pa_base
+from pypurpleair import influx
+from pypurpleair import measurement_base
+from pypurpleair import sensor_base
+
+_TAG_KEYS = {
+    "SensorId",
+    "Geo",
+    "ssid",
+    "lat",
+    "lon",
+    "place",
+    "version",
+    "hardwareversion",
+    "hardwarediscovered",
+}
 
 
-class SensorReading(pa_base.SensorReadingBase):
+class Measurement(measurement_base.MeasurementBase):
     def __init__(self, sensor_data: Dict[str, Any]):
         self._data = sensor_data
+
+    def prepare_for_influxdb(self) -> Dict[str, Any]:
+        """Prepare data as an InfluxDB point"""
+        tags: Dict[str, Any] = {}
+        for key in _TAG_KEYS:
+            tags[key] = self._data[key]
+
+        fields: Dict[str, Any] = {}
+        for key in sorted(self._data.keys()):
+            if key.startswith("current"):
+                fields[key] = self._data[key]
+            if key.startswith("p") and key not in ["pa_latency", "period", "place"]:
+                fields[key] = self._data[key]
+            if key in ["rssi", "uptime"]:
+                fields[key] = self._data[key]
+
+        influx_point = {"time": self.timestamp, "tags": tags, "fields": fields}
+        return influx_point
 
     @property
     def sensor_id(self) -> str:
@@ -35,6 +67,10 @@ class SensorReading(pa_base.SensorReadingBase):
     @property
     def rssi(self) -> int:
         return self._data["rssi"]
+
+    @property
+    def uptime(self) -> int:
+        return self._data["uptime"]
 
     @property
     def temp_f(self) -> int:
@@ -157,7 +193,7 @@ class SensorReading(pa_base.SensorReadingBase):
         return self._data["pm10_0_cf_1_b"]
 
 
-class Sensor(pa_base.SensorBase):
+class Sensor(sensor_base.SensorBase):
     """LAN Sensor class.
 
     A Purpleair sensor's data can be found at the following:
@@ -167,21 +203,23 @@ class Sensor(pa_base.SensorBase):
     http://<IP_ADDRESS>/json?live=true
     """
 
-    def __init__(self, addr: str):
+    def __init__(self, addr: str, db: Optional[influx.PurpleAirDb] = None):
         """Create a sensor object
 
         Args:
             addr: (str) The IP address to query. Do not include the http://
+            db: Optional database client.
         """
         if not re.fullmatch(r"\d+.\d+.\d+.\d+", addr):
             if not re.match(r"^purpleair-\d+", addr.lower()):
                 raise ValueError("addr must be an IP or PurpleAir hostname.")
 
+        super().__init__(db)
         self._addr = addr
 
     @property
-    def _reading_klass(self) -> Type:
-        return SensorReading
+    def _measurement_klass(self) -> Type:
+        return Measurement
 
     def _construct_url(self, live: bool) -> str:
         """Construct a URL to request.
@@ -197,7 +235,7 @@ class Sensor(pa_base.SensorBase):
             url = f"{url}?live=true"
         return url
 
-    def get_sensor_reading(self, *, live: bool = True) -> Optional[SensorReading]:
+    def get_measurement(self, *, live: bool = True) -> Optional[Measurement]:
         """Get a reading of the PurpleAir sensor.
 
         Args:
@@ -206,7 +244,7 @@ class Sensor(pa_base.SensorBase):
         Returns:
             A SensorReading object if the query succeeds else None
         """
-        return super().get_sensor_reading(live=live)
+        return super().get_measurement(live=live)
 
     def query_sensor(self, *, live: bool = True) -> Optional[Dict[str, Any]]:
         """Query a sensor and return a dict from the json result
