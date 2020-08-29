@@ -6,6 +6,7 @@ import logging
 from typing import Any, Dict, Optional, Type
 
 import requests
+from requests import exceptions as rq_err
 
 from pypurpleair import influx
 from pypurpleair import measurement_base
@@ -15,6 +16,7 @@ class SensorBase(abc.ABC):
     """Sensor base class."""
 
     _db: Optional[influx.PurpleAirDb] = None
+    _connected: bool = True
 
     @abc.abstractmethod
     def __init__(self, db: Optional[influx.PurpleAirDb] = None):
@@ -75,14 +77,20 @@ class SensorBase(abc.ABC):
 
         return json.loads(json_str)
 
-    @staticmethod
-    def _make_request(url) -> Optional[str]:
+    def _make_request(self, url) -> Optional[str]:
         """Perform the http get request
 
         Returns:
             A string in json format from the sensor
         """
-        response = requests.get(url)
+        try:
+            response = requests.get(url)
+        except rq_err.ConnectionError as err:
+            if self._set_connection_state(False):
+                logging.error("Requests Connection Error:")
+                logging.error(str(err))
+            return None
+
         if response.status_code != 200:
             logging.error(f"Cannot query URL: {url}")
             logging.error(f"Response status code: {response.status_code}")
@@ -90,3 +98,24 @@ class SensorBase(abc.ABC):
             return None
 
         return response.text
+
+    @abc.abstractproperty
+    def _lost_connection_msg(self):
+        ...
+
+    @abc.abstractproperty
+    def _regained_connection_msg(self):
+        ...
+
+    def _set_connection_state(self, state: bool) -> bool:
+        """Set the connection state to the sensor and report any changes"""
+        state_changed = False
+        if state and not self._connected:
+            logging.info(self._regained_connection_msg)
+            state_changed = True
+        elif self._connected and not state:
+            logging.error(self._lost_connection_msg)
+            state_changed = True
+
+        self._connected = state
+        return state_changed

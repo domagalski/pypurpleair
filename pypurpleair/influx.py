@@ -127,10 +127,10 @@ class PurpleAirDb(influxdb.InfluxDBClient):
         """Set the connection state to InfluxDB and report any changes"""
         state_changed = False
         if state and not self._connected:
-            logging.info("Regained connection to InfluxDB.")
+            logging.info("Connected to InfluxDB.")
             state_changed = True
         elif self._connected and not state:
-            logging.error("Lost connection to InfluxDB.")
+            logging.error("Cannot connect to InfluxDB.")
             state_changed = True
 
         self._connected = state

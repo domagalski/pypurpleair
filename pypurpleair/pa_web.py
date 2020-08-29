@@ -346,3 +346,11 @@ class Sensor(sensor_base.SensorBase):
     def _construct_url(self) -> str:
         url = f"https://www.purpleair.com/json?show={self._sensor_id}"
         return url
+
+    @property
+    def _lost_connection_msg(self):
+        return "Cannot connect: purpleair.com"
+
+    @property
+    def _regained_connection_msg(self):
+        return "Connected: purpleair.com"

@@ -221,6 +221,14 @@ class Sensor(sensor_base.SensorBase):
     def _measurement_klass(self) -> Type:
         return Measurement
 
+    @property
+    def _lost_connection_msg(self):
+        return f"Cannot connect to sensor: {self._addr}"
+
+    @property
+    def _regained_connection_msg(self):
+        return f"Connected to sensor: {self._addr}"
+
     def _construct_url(self, live: bool) -> str:
         """Construct a URL to request.
 
