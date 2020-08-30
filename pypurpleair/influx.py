@@ -27,7 +27,7 @@ class PurpleAirDb(influxdb.InfluxDBClient):
 
     def _get_database_names(self) -> Optional[List[str]]:
         """Get a list of database names in InfluxDB."""
-        db_dict_list = self._run_influx_request(self.get_list_database, default_return_value=None)
+        db_dict_list = self.run_influx_request(self.get_list_database, default_return_value=None)
         if db_dict_list is None:
             logging.error("Cannot fetch database names.")
             return None
@@ -44,7 +44,7 @@ class PurpleAirDb(influxdb.InfluxDBClient):
 
         if database_name not in db_name_list:
             logging.info(f"Creating database: {database_name!r}")
-            if self._run_influx_request(
+            if self.run_influx_request(
                 self.create_database, database_name, default_return_value=True
             ):
                 logging.error(f"Cannot create database: {database_name}")
@@ -80,7 +80,7 @@ class PurpleAirDb(influxdb.InfluxDBClient):
         if "fields" in influx_point:
             influx_point = self._pop_none_from_dict(influx_point, "fields")
 
-        success = self._run_influx_request(
+        success = self.run_influx_request(
             self.write_points,
             [influx_point],
             time_precision=self._time_precision,
@@ -93,7 +93,7 @@ class PurpleAirDb(influxdb.InfluxDBClient):
             logging.warning("Failed to write sensor measurement to InfluxDB.")
         return success
 
-    def _run_influx_request(
+    def run_influx_request(
         self,
         func,
         *args,
