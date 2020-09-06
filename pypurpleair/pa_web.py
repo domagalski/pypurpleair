@@ -81,6 +81,9 @@ class Measurement(measurement_base.MeasurementBase):
                 fields[key + "_b"] = self.__getattribute__(key)
             fields["pm2.5_aqi_b"] = self.pm2_5_aqi
 
+        fields["pm2.5_epa_correction"] = self.pm2_5_epa_correction
+        fields["pm2.5_aqi_epa"] = self.pm2_5_aqi_epa
+
         influx_point = {"time": self.timestamp, "tags": tags, "fields": fields}
         return influx_point
 
@@ -141,54 +144,17 @@ class Measurement(measurement_base.MeasurementBase):
             pressure = float(pressure)
         return pressure
 
-    @staticmethod
-    def _get_aqi(pm_2_5: float) -> float:
-        """Convert a pm 2.5 value to an AQI"""
-        # Taken from wikipedia: https://en.wikipedia.org/wiki/Air_quality_index
-        concentration_limits = [
-            (0.0, 12.0),
-            (12.1, 35.4),
-            (35.5, 55.4),
-            (55.5, 150.4),
-            (150.5, 250.4),
-            (250.5, 350.4),
-            (350.5, 500.4),
-        ]
-        aqi_limits = [
-            (0, 50),
-            (51, 100),
-            (101, 150),
-            (151, 200),
-            (201, 300),
-            (301, 400),
-            (401, 500),
-        ]
-        limit = None
-        index_breakpoints = None
-        for i, (low, high) in enumerate(concentration_limits):
-            if low <= pm_2_5 <= high:
-                limit = (low, high)
-                index_breakpoints = aqi_limits[i]
-                break
-        if limit is None:
-            raise RuntimeError(f"PM 2.5 out of range: {pm_2_5}")
-
-        c_low, c_high = limit
-        i_low, i_high = index_breakpoints
-        aqi = (i_high - i_low) * (pm_2_5 - c_low) / (c_high - c_low) + i_low
-        return aqi
-
     @property
     def pm2_5_aqi(self) -> int:
         pm_2_5 = float(self._ch_a["PM2_5Value"])
-        return self._get_aqi(pm_2_5)
+        return self.get_aqi(pm_2_5)
 
     @property
     def pm2_5_aqi_b(self) -> Optional[int]:
         pm_2_5 = self._ch_b.get("PM2_5Value")
         if pm_2_5 is None:
             return None
-        return self._get_aqi(float(pm_2_5))
+        return self.get_aqi(float(pm_2_5))
 
     @property
     def p_0_3_um(self) -> float:

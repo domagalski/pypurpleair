@@ -47,6 +47,8 @@ class PurpleAirLanTest(unittest.TestCase):
         self.assertFalse(isinstance(measurement.pm2_5_aqi, str))
         self.assertFalse(isinstance(measurement.pm2_5_aqi_b, str))
         self.assertIsNotNone(measurement.pm2_5_aqi_b)
+        self.assertFalse(isinstance(measurement.pm2_5_aqi_epa, str))
+        self.assertIsNotNone(measurement.pm2_5_aqi_epa)
         self.assertFalse(isinstance(measurement.p_0_3_um, str))
         self.assertFalse(isinstance(measurement.p_0_3_um_b, str))
         self.assertIsNotNone(measurement.p_0_3_um_b)

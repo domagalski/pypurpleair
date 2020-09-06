@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import abc
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class MeasurementBase(abc.ABC):
@@ -13,6 +13,99 @@ class MeasurementBase(abc.ABC):
     def data(self) -> Dict[str, Any]:
         """Return the internal data dictionary"""
         return self._data
+
+    @staticmethod
+    def get_aqi(pm_2_5: float) -> float:
+        """Convert a pm 2.5 value to an AQI"""
+        # NOTE: since the table on wikipedia is ambiguous to what happens at
+        # jump points if there is more than a decimal of precision. Therefore,
+        # we multiplying pm2.5 by 10 and convert to and int for detecting the
+        # concentration limits of the pm2.5 value.
+        pm_2_5 = int(pm_2_5 * 10)
+
+        # Taken from wikipedia: https://en.wikipedia.org/wiki/Air_quality_index
+        concentration_limits = [
+            (0, 120),
+            (121, 354),
+            (355, 554),
+            (555, 1504),
+            (1505, 2504),
+            (2505, 3504),
+            (3505, 5004),
+        ]
+        aqi_limits = [
+            (0, 50),
+            (51, 100),
+            (101, 150),
+            (151, 200),
+            (201, 300),
+            (301, 400),
+            (401, 500),
+        ]
+
+        limit = None
+        index_breakpoints = None
+        for i, (low, high) in enumerate(concentration_limits):
+            if low <= pm_2_5 <= high:
+                pm_2_5 /= 10
+                limit = (low / 10, high / 10)
+                index_breakpoints = aqi_limits[i]
+                break
+        if limit is None:
+            raise RuntimeError(f"PM 2.5 out of range: {pm_2_5}")
+
+        c_low, c_high = limit
+        i_low, i_high = index_breakpoints
+        aqi = (i_high - i_low) * (pm_2_5 - c_low) / (c_high - c_low) + i_low
+        return aqi
+
+    @staticmethod
+    def get_epa_correction(
+        pm2_5_cf_1_a: Optional[float], pm2_5_cf_1_b: Optional[float], humidity: Optional[float]
+    ) -> Optional[float]:
+        """Run the EPA correction on purpleair sensors
+
+        Ref:
+            - https://cfpub.epa.gov/si/si_public_record_report.cfm?Lab=CEMM&dirEntryId=349513
+
+        Note:
+            This doesn't run the 1-hour averages that are recommended as the
+            measurement class only deals with current readings.
+
+        Note:
+            The web sensor has the possibility of null-values.
+
+        Args:
+            pm2_5_cf_1_a: (float) Channel A reading of pm2.5 concentration with CF 1
+            pm2_5_cf_1_b: (float) Channel B reading of pm2.5 concentration with CF 1
+            humidity: (float) Current humidity measured by the sensor.
+
+        Returns:
+            corrected pm2.5 value
+        """
+        if None in [pm2_5_cf_1_a, pm2_5_cf_1_b, humidity]:
+            return None
+
+        # Using the equation on page 8 of the EPA report pdf
+        # constants on that page are different than at the end for some reason.
+        pm2_5_mean = (pm2_5_cf_1_a + pm2_5_cf_1_b) / 2
+        return 0.52 * pm2_5_mean - 0.085 * humidity + 5.71
+
+    @property
+    def pm2_5_epa_correction(self) -> Optional[float]:
+        return self.get_epa_correction(self.pm2_5_cf_1, self.pm2_5_cf_1_b, self.humidity)
+
+    @property
+    def pm2_5_aqi_epa(self) -> Optional[float]:
+        pm2_5_epa = self.pm2_5_epa_correction
+        if pm2_5_epa is None:
+            return None
+
+        return self.get_aqi(pm2_5_epa)
+
+    #
+    # Data fields as properties
+    #
 
     @abc.abstractmethod
     def prepare_for_influxdb(self) -> Dict[str, Any]:

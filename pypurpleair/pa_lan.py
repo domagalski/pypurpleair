@@ -41,6 +41,9 @@ class Measurement(measurement_base.MeasurementBase):
             if key in ["rssi", "uptime"]:
                 fields[key] = self._data[key]
 
+        fields["pm2.5_epa_correction"] = self.pm2_5_epa_correction
+        fields["pm2.5_aqi_epa"] = self.pm2_5_aqi_epa
+
         influx_point = {"time": self.timestamp, "tags": tags, "fields": fields}
         return influx_point
 

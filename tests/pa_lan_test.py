@@ -47,6 +47,7 @@ class PurpleAirLanTest(unittest.TestCase):
         logging.info(f"Pressure: {measurement.pressure}")
         logging.info(f"AQI (A): {measurement.pm2_5_aqi}")
         logging.info(f"AQI (B): {measurement.pm2_5_aqi_b}")
+        logging.info(f"AQI (EPA): {measurement.pm2_5_aqi_epa}")
         logging.info(f"0.3 um/dl (A): {measurement.p_0_3_um}")
         logging.info(f"0.3 um/dl (B): {measurement.p_0_3_um_b}")
         logging.info(f"0.5 um/dl (A): {measurement.p_0_5_um}")
