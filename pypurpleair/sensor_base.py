@@ -26,6 +26,7 @@ class SensorBase(abc.ABC):
             db: Optional database client.
         """
         self._db = db
+        self._last_measurement_valid = False
 
     @abc.abstractmethod
     def _construct_url(self, *args, **kwargs) -> str:
@@ -40,9 +41,16 @@ class SensorBase(abc.ABC):
     def query_and_write_database(self, *args, influx_measurement: str, **kwargs) -> bool:
         """Query the sensor and write the measurements to InfluxDB"""
         sensor_measurement = self.get_measurement(*args, **kwargs)
-        if not sensor_measurement:
-            logging.error("Error fetching sensor measurement. Cannot write database.")
+        if sensor_measurement:
+            if not self._last_measurement_valid:
+                logging.info("Successfully fetched data from sensor.")
+            self._last_measurement_valid = True
+        else:
+            if self._last_measurement_valid:
+                logging.error("Error fetching sensor measurement. Cannot write database.")
+            self._last_measurement_valid = False
             return False
+
         if self._db:
             return self._db.write_sensor_measurement(sensor_measurement, influx_measurement)
         else:

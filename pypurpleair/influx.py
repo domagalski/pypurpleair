@@ -77,11 +77,11 @@ class PurpleAirDb(influxdb.InfluxDBClient):
         influx_point = sensor_measurement.prepare_for_influxdb()
         if influx_point:
             if not self._last_sensor_read_valid:
-                logging.info("Successfully fetched sensor measurement.")
+                logging.info("Sensor measurement contains valid data. Writing to database.")
             self._last_sensor_read_valid = True
         else:
             if self._last_sensor_read_valid:
-                logging.error("Failed to fetch sensor measurement.")
+                logging.error("Sensor measurement contains invalid data. Skipping database write.")
             self._last_sensor_read_valid = False
             return
 
