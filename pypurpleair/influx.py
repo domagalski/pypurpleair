@@ -23,7 +23,9 @@ class PurpleAirDb(influxdb.InfluxDBClient):
         kwargs["database"] = self._db_name
         super().__init__(**kwargs)
 
+        self._first_write = True
         self._connected = True
+        self._last_sensor_read_valid = False
 
     def _get_database_names(self) -> Optional[List[str]]:
         """Get a list of database names in InfluxDB."""
@@ -43,14 +45,14 @@ class PurpleAirDb(influxdb.InfluxDBClient):
             return False
 
         if database_name not in db_name_list:
-            logging.info(f"Creating database: {database_name!r}")
+            logging.info(f"Creating InfluxDB database: {database_name!r}")
             if self.run_influx_request(
                 self.create_database, database_name, default_return_value=True
             ):
-                logging.error(f"Cannot create database: {database_name}")
+                logging.error(f"Cannot create InfluxDB database: {database_name}")
                 return False
 
-        logging.info(f"Using database: {database_name!r}")
+        logging.info(f"Using InfluxDB database: {database_name!r}")
         self.switch_database(database_name)
         self._db_name = database_name
         return True
@@ -73,12 +75,26 @@ class PurpleAirDb(influxdb.InfluxDBClient):
             influx_measurement: (str) Name of the influx measurement/table to write to.
         """
         influx_point = sensor_measurement.prepare_for_influxdb()
+        if influx_point:
+            if not self._last_sensor_read_valid:
+                logging.info("Successfully fetched sensor measurement.")
+            self._last_sensor_read_valid = True
+        else:
+            if self._last_sensor_read_valid:
+                logging.error("Failed to fetch sensor measurement.")
+            self._last_sensor_read_valid = False
+            return
+
         influx_point["measurement"] = influx_measurement
 
         if "tags" in influx_point:
             influx_point = self._pop_none_from_dict(influx_point, "tags")
         if "fields" in influx_point:
             influx_point = self._pop_none_from_dict(influx_point, "fields")
+
+        # Force a log message on a successful write.
+        if self._first_write:
+            self._connected = False
 
         success = self.run_influx_request(
             self.write_points,
@@ -89,7 +105,10 @@ class PurpleAirDb(influxdb.InfluxDBClient):
             success_request_msg="Sensor measurement written to InfluxDB.",
         )
 
-        if not success:
+        if success:
+            if self._first_write:
+                self._first_write = False
+        else:
             logging.warning("Failed to write sensor measurement to InfluxDB.")
         return success
 

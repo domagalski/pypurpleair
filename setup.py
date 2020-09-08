@@ -6,7 +6,7 @@ from distutils.core import setup
 pkg_name = "pypurpleair"
 setup(
     name=pkg_name,
-    version="0.1.5",
+    version="0.1.6",
     description="Simple API for reading PurpleAir sensors.",
     author="Rachel Simone Domagalski",
     license="GPL",

@@ -26,8 +26,17 @@ class Measurement(measurement_base.MeasurementBase):
     def __init__(self, sensor_data: Dict[str, Any]):
         self._data = sensor_data
 
-    def prepare_for_influxdb(self) -> Dict[str, Any]:
+    def prepare_for_influxdb(self) -> Optional[Dict[str, Any]]:
         """Prepare data as an InfluxDB point"""
+        # This happens in early boot-phase when data isn't yet available.
+        for key, value in self._data.items():
+            # Only check particle sensor readings. This skips over Adc,
+            # which takes a lot longer to initialize after boot.
+            if not (key.startswith("p_") or key.startswith("pm")):
+                continue
+            if value == "nan":
+                return None
+
         tags: Dict[str, Any] = {}
         for key in _TAG_KEYS:
             tags[key] = self._data[key]
