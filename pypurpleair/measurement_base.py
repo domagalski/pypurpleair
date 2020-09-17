@@ -91,7 +91,7 @@ class MeasurementBase(abc.ABC):
         pm2_5_mean = (pm2_5_cf_1_a + pm2_5_cf_1_b) / 2
         # It's possible when pm2_5 is near zero and the humidty is high that pm2.5
         # could go negative after correction. Assume anything less than zero is zero.
-        return max(0, 0.52 * pm2_5_mean - 0.085 * humidity + 5.71)
+        return max(0.0, 0.52 * pm2_5_mean - 0.085 * humidity + 5.71)
 
     @property
     def pm2_5_epa_correction(self) -> Optional[float]:
