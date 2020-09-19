@@ -45,14 +45,12 @@ class MeasurementBase(abc.ABC):
 
         limit = None
         index_breakpoints = None
-        for i, (low, high) in enumerate(concentration_limits):
+        for ii, (low, high) in enumerate(concentration_limits):
             if low <= pm_2_5 <= high:
-                pm_2_5 /= 10
-                limit = (low / 10, high / 10)
-                index_breakpoints = aqi_limits[i]
                 break
-        if limit is None:
-            raise RuntimeError(f"PM 2.5 out of range: {pm_2_5}")
+        pm_2_5 /= 10
+        limit = (low / 10, high / 10)
+        index_breakpoints = aqi_limits[ii]
 
         c_low, c_high = limit
         i_low, i_high = index_breakpoints
@@ -89,7 +87,9 @@ class MeasurementBase(abc.ABC):
         # Using the equation on page 8 of the EPA report pdf
         # constants on that page are different than at the end for some reason.
         pm2_5_mean = (pm2_5_cf_1_a + pm2_5_cf_1_b) / 2
-        return 0.52 * pm2_5_mean - 0.085 * humidity + 5.71
+        # It's possible when pm2_5 is near zero and the humidty is high that pm2.5
+        # could go negative after correction. Assume anything less than zero is zero.
+        return max(0.0, 0.52 * pm2_5_mean - 0.085 * humidity + 5.71)
 
     @property
     def pm2_5_epa_correction(self) -> Optional[float]:
