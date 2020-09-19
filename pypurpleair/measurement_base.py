@@ -45,14 +45,12 @@ class MeasurementBase(abc.ABC):
 
         limit = None
         index_breakpoints = None
-        for i, (low, high) in enumerate(concentration_limits):
+        for ii, (low, high) in enumerate(concentration_limits):
             if low <= pm_2_5 <= high:
-                pm_2_5 /= 10
-                limit = (low / 10, high / 10)
-                index_breakpoints = aqi_limits[i]
                 break
-        if limit is None:
-            raise RuntimeError(f"PM 2.5 out of range: {pm_2_5}")
+        pm_2_5 /= 10
+        limit = (low / 10, high / 10)
+        index_breakpoints = aqi_limits[ii]
 
         c_low, c_high = limit
         i_low, i_high = index_breakpoints
