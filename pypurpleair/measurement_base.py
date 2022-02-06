@@ -84,12 +84,12 @@ class MeasurementBase(abc.ABC):
         if None in [pm2_5_cf_1_a, pm2_5_cf_1_b, humidity]:
             return None
 
-        # Using the equation on page 8 of the EPA report pdf
-        # constants on that page are different than at the end for some reason.
+        # Using the equation on page 25 of the EPA report pdf
+        # constants on that page are different than at page 8 for some reason.
         pm2_5_mean = (pm2_5_cf_1_a + pm2_5_cf_1_b) / 2
         # It's possible when pm2_5 is near zero and the humidty is high that pm2.5
         # could go negative after correction. Assume anything less than zero is zero.
-        return max(0.0, 0.52 * pm2_5_mean - 0.085 * humidity + 5.71)
+        return max(0.0, 0.534 * pm2_5_mean - 0.0844 * humidity + 5.604)
 
     @property
     def pm2_5_epa_correction(self) -> Optional[float]:
