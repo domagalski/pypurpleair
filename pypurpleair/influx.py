@@ -19,13 +19,17 @@ class PurpleAirDb(influxdb.InfluxDBClient):
     _time_precision = "ms"
 
     def __init__(self, **kwargs):
-        self._db_name = kwargs.get("database") or DEFAULT_DATABASE
+        self._db_name: str = kwargs.get("database") or DEFAULT_DATABASE
         kwargs["database"] = self._db_name
         super().__init__(**kwargs)
 
         self._first_write = True
         self._connected = True
         self._last_sensor_read_valid = False
+
+    @property
+    def db_name(self) -> str:
+        return self._db_name
 
     def _get_database_names(self) -> Optional[List[str]]:
         """Get a list of database names in InfluxDB."""
